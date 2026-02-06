@@ -22,7 +22,7 @@ title: Installation Et Reproduction
 #### Étape 1 : Clonage du Dépôt
 
 ```bash
-git clone https://github.com/<username>/nutriscan.git
+git clone https://github.com/EpitechPGE45-2025/G-AIA-910-PAR-9-2-computervision-12
 cd nutriscan
 ```
 
@@ -195,7 +195,7 @@ Les résultats de validation sont sauvegardés automatiquement. Vous pouvez visu
 
 ![Résultats de validation](/img/models/yolov8m_foodseg103/val_batch0_pred.jpg)
 
-*Exemple de prédictions sur un batch de validation avec masques de segmentation*
+_Exemple de prédictions sur un batch de validation avec masques de segmentation_
 
 #### Étape 8 : Inférence sur Image
 
@@ -285,6 +285,6 @@ mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000
 
 ![Courbes d'apprentissage](/img/models/yolov8m_foodseg103/results.png)
 
-*Courbes d'apprentissage complètes disponibles dans MLflow UI et dans les fichiers de résultats YOLOv8*
+_Courbes d'apprentissage complètes disponibles dans MLflow UI et dans les fichiers de résultats YOLOv8_
 
 ---
