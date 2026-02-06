@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap');
+
+:root {
+  --ifm-color-primary: #0f766e;
+  --ifm-color-primary-dark: #0d6a63;
+  --ifm-color-primary-darker: #0b5e58;
+  --ifm-color-primary-darkest: #094b45;
+  --ifm-color-primary-light: #13867c;
+  --ifm-color-primary-lighter: #16a394;
+  --ifm-color-primary-lightest: #2cc9b7;
+  --ifm-background-color: #f5faf9;
+  --ifm-font-color-base: #1f2937;
+  --ifm-font-family-base: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  --ifm-heading-font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+  --ifm-code-font-size: 95%;
+  --ifm-link-color: #0b8f86;
+  --ifm-menu-color-active: #0f766e;
+  --ifm-navbar-background-color: #f8fcfb;
+  --ifm-footer-background-color: #0c1720;
+
+  --ns-surface-hero-1: #effaf7;
+  --ns-surface-hero-2: #e2f3ef;
+  --ns-surface-glow: rgba(15, 118, 110, 0.23);
+  --ns-surface-glow-2: rgba(13, 106, 99, 0.16);
+  --ns-surface-card: #ffffff;
+  --ns-surface-code: #f7fbfa;
+  --ns-border: #d4ece5;
+  --ns-text-soft: #3d5566;
+  --ns-hero-title-text: #102433;
+  --ns-hero-subtitle-text: #18384b;
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #3dd6c5;
+  --ifm-color-primary-dark: #23c8b5;
+  --ifm-color-primary-darker: #15b3a1;
+  --ifm-color-primary-darkest: #118a7c;
+  --ifm-color-primary-light: #56ddce;
+  --ifm-color-primary-lighter: #74e6d9;
+  --ifm-color-primary-lightest: #a7f2ea;
+  --ifm-background-color: #091117;
+  --ifm-font-color-base: #e8f3f1;
+  --ifm-link-color: #74e6d9;
+  --ifm-navbar-background-color: #0c1620;
+  --ifm-footer-background-color: #05090d;
+  --ifm-menu-color-active: #74e6d9;
+
+  --ns-surface-hero-1: #0e1c28;
+  --ns-surface-hero-2: #12273a;
+  --ns-surface-glow: rgba(61, 214, 197, 0.18);
+  --ns-surface-glow-2: rgba(116, 230, 217, 0.12);
+  --ns-surface-card: #0f1d29;
+  --ns-surface-code: #111f2b;
+  --ns-border: #1c3245;
+  --ns-text-soft: #aac4cf;
+  --ns-hero-title-text: #eef9f7;
+  --ns-hero-subtitle-text: #cae8e2;
+}
+
+.navbar,
+.footer {
+  border-color: var(--ns-border);
+}

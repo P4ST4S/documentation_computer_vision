@@ -1,0 +1,48 @@
+# Dependencies
+/node_modules
+
+# Production
+/build
+
+# Generated files
+.docusaurus
+.cache-loader
+
+# Misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+static/img/models/yolov8m_foodseg103/weights/best.onnx
+static/img/models/yolov8m_foodseg103/weights/best.pt
+static/img/models/yolov8m_foodseg103/weights/epoch0.pt
+static/img/models/yolov8m_foodseg103/weights/epoch15.pt
+static/img/models/yolov8m_foodseg103/weights/epoch30.pt
+static/img/models/yolov8m_foodseg103/weights/epoch45.pt
+static/img/models/yolov8m_foodseg103/weights/epoch60.pt
+static/img/models/yolov8m_foodseg103/weights/epoch75.pt
+static/img/models/yolov8m_foodseg103/weights/epoch90.pt
+static/img/models/yolov8m_foodseg103/weights/epoch105.pt
+static/img/models/yolov8m_foodseg103/weights/epoch120.pt
+static/img/models/yolov8m_foodseg103/weights/epoch135.pt
+static/img/models/yolov8m_foodseg103/weights/epoch150.pt
+static/img/models/yolov8m_foodseg103/weights/last.pt
+static/img/models/yolov8s_foodseg103/weights/best.pt
+static/img/models/yolov8s_foodseg103/weights/epoch0.pt
+static/img/models/yolov8s_foodseg103/weights/epoch1.pt
+static/img/models/yolov8s_foodseg103/weights/epoch15.pt
+static/img/models/yolov8s_foodseg103/weights/epoch30.pt
+static/img/models/yolov8s_foodseg103/weights/epoch45.pt
+static/img/models/yolov8s_foodseg103/weights/epoch60.pt
+static/img/models/yolov8s_foodseg103/weights/epoch75.pt
+static/img/models/yolov8s_foodseg103/weights/epoch90.pt
+static/img/models/yolov8s_foodseg103/weights/epoch105.pt
+static/img/models/yolov8s_foodseg103/weights/epoch120.pt
+static/img/models/yolov8s_foodseg103/weights/epoch135.pt
+static/img/models/yolov8s_foodseg103/weights/epoch150.pt
+static/img/models/yolov8s_foodseg103/weights/last.pt
