@@ -53,9 +53,9 @@ mlflow ui --backend-store-uri sqlite:///notebooks/mlflow.db
 
 ### D. Contacts
 
-**Auteur** : Antoine ROSPARS, Yann LEBIB, Jean-Pierre JANOPOULOS
-**Email** : antoine.rospars@epitech.eu, yann.lebib@epitech.eu, jean-pierre.janopoulos@epitech.eu
-**GitHub** : https://github.com/P4ST4S
+**Auteur** : Antoine ROSPARS, Yann LEBIB, Jean-Pierre JANOPOULOS <br/>
+**Email** : antoine.rospars@epitech.eu, yann.lebib@epitech.eu, jean-pierre.janopoulos@epitech.eu <br/>
+**GitHub** : https://github.com/P4ST4S <br/>
 **Date de Soutenance** : [À déterminer]
 
 ---
