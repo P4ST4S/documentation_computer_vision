@@ -10,12 +10,12 @@ title: Limitations Et Travaux Futurs
 
 ### Limitations Techniques
 
-| Limitation                            | Impact          | Explication Technique                                                                                                                                                                                    |
-| ------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Instance unique par classe**        |  Majeur       | L'algorithme `mask_to_yolo_format()` sélectionne le plus grand contour uniquement (ligne 117: `max(contours, key=cv2.contourArea)`). **Exemple raté** : Image avec 2 pommes de terre → 1 seule détectée. |
-| **Classes déséquilibrées**            |  Modéré       | Ratio 2.1:1 entre classe max (bread, 991 img) et min (rice, 464 img). Modèle biaisé vers classes fréquentes.                                                                                             |
-| **Résolution 640×640**                |  Modéré       | Textures fines (viandes, sauces) perdent détails critiques après downscaling depuis 798×652 px moyen.                                                                                                    |
-| **Pas de calibration nutritionnelle** |  Bloquant MVP | Le modèle prédit les classes mais pas les quantités (g, mL). Nécessite régression volume/poids.                                                                                                          |
+| Limitation                     | Impact | Explication Technique                                                                                                                                                                                    |
+| ------------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Instance unique par classe** | Majeur | L'algorithme `mask_to_yolo_format()` sélectionne le plus grand contour uniquement (ligne 117: `max(contours, key=cv2.contourArea)`). **Exemple raté** : Image avec 2 pommes de terre → 1 seule détectée. |
+| **Classes déséquilibrées**     | Modéré | Ratio 2.1:1 entre classe max (bread, 991 img) et min (rice, 464 img). Modèle biaisé vers classes fréquentes.                                                                                             |
+| **Résolution 640×640**         | Modéré | Textures fines (viandes, sauces) perdent détails critiques après downscaling depuis 798×652 px moyen.                                                                                                    |
+| **Confusion viandes**          | Modéré | Le modèle confond fréquemment steak/porc/poulet (mAP faible sur porc ~19%). Atténué par NMS cross-class + suppression manuelle UX.                                                                       |
 
 ### Limitations du Dataset
 
@@ -23,97 +23,88 @@ title: Limitations Et Travaux Futurs
 - **Conditions d'acquisition** : Photos professionnelles haute qualité ≠ photos utilisateurs (flou, éclairage faible, angles extrêmes)
 - **Annotations imprécises** : Erreurs manuelles dans masques (vérifiées en EDA, ~2% d'images)
 
-## Travaux Futurs (Roadmap Technique)
+## Travaux Réalisés
 
-### Phase 3 : Estimation Nutritionnelle (Semaine 3)
+### Phase 3 : Estimation Nutritionnelle (Complétée)
 
 **Objectif** : Associer segmentation → quantité → calories
 
-**Pipeline proposé** :
-
-```python
-Masque segmenté (pixels)
-    │
-    ▼
-Estimation volume 3D
-│  - Hypothèse forme (sphère, cylindre, prisme)
-│  - Calibration avec objet référence (assiette standard 26 cm)
-│  - Équation: Volume = f(Aire_masque, Profondeur_estimée)
-    │
-    ▼
-Conversion poids
-│  - Densité spécifique par classe (kg/L)
-│  - Exemple: ρ_rice = 0.85 kg/L, ρ_ice_cream = 0.54 kg/L
-    │
-    ▼
-Requête base nutritionnelle
-│  - API: USDA FoodData Central
-│  - Entrée: (classe, poids_g)
-│  - Sortie: {calories, protéines, lipides, glucides}
-    │
-    ▼
-Agrégation totale repas
-```
-
-**Défis techniques** :
-
-1. **Estimation de profondeur monoculaire** : Réseau CNN additionnel (MiDaS, DPT) ou depth-from-stereo
-2. **Calibration dynamique** : Détection automatique d'objet référence (assiette, fourchette) pour échelle
-
-### Phase 4 : Déploiement Production (Semaine 4)
-
-**Architecture cible** :
+**Implémentation réalisée** (approche physics-based) :
 
 ```
-┌─────────────────┐
-│  Frontend React │  (Upload image)
-│  Mobile/Web     │
-└────────┬────────┘
-         │ HTTP POST /predict
-         ▼
-┌──────────────────────────────────┐
-│  API REST (FastAPI)              │
-│  - Endpoint: /api/v1/predict     │
-│  - Rate limiting: 10 req/min     │
-│  - Auth: JWT tokens              │
-└────────┬─────────────────────────┘
-         │
-         ▼
-┌──────────────────────────────────┐
-│  ONNX Runtime                    │
-│  - Model: best.onnx (FP16)       │
-│  - Device: GPU (TensorRT) ou CPU │
-│  - Latence: &lt;200ms/image         │
-└────────┬─────────────────────────┘
-         │
-         ▼
-┌──────────────────────────────────┐
-│  Post-traitement                 │
-│  - NMS (conf>0.25, IoU>0.45)     │
-│  - Calcul nutrition par instance │
-│  - Agrégation totale repas       │
-└────────┬─────────────────────────┘
-         │
-         ▼
-    JSON Response
-    {
-      "items": [
-        {"class": "bread", "calories": 75, "weight_g": 30, "bbox": [...], "mask": [...]}
-      ],
-      "total_calories": 512,
-      "processing_time_ms": 187
-    }
+Masque binaire 640×640 (pixels)
+    │
+    ▼ pixelCount = somme des pixels actifs
+    │
+    ▼ × (30/640)² cm²/pixel         ← Calibration: 640px = 30cm
+areaRealCm² (surface réelle)
+    │
+    ▼ × épaisseur (cm)              ← Par classe (ex: pain=2cm, steak=2cm, sauce=0.5cm)
+volumeCm³
+    │
+    ▼ × densité (g/cm³)             ← Par classe (ex: pain=0.25, steak=1.05, riz=0.75)
+weightGrams
+    │
+    ▼ × nutrition/100g              ← Base de données intégrée (12 classes)
+{calories, protéines, glucides, lipides, fibres}
+    │
+    ▼
+Agrégation totale du repas
 ```
 
-**Stack technologique proposée** :
+**Base de données nutritionnelle** : 12 classes avec densité, épaisseur par défaut, et valeurs nutritionnelles par 100g (calories, protéines, glucides, lipides, fibres).
 
-- **Backend** : FastAPI 0.109 (Python 3.11)
-- **Inférence** : ONNX Runtime 1.17 avec TensorRT EP (NVIDIA)
-- **Containerisation** : Docker (image nvidia/cuda:12.6-runtime)
-- **Orchestration** : Kubernetes (scalabilité horizontale)
-- **Monitoring** : Prometheus + Grafana (latence, throughput, erreurs)
+### Phase 4 : Déploiement Production (Complétée)
 
-### Améliorations Modèle
+**Architecture déployée** — Edge AI (zéro serveur) :
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│  Navigateur (tout côté client)                                │
+│                                                               │
+│  ┌────────────────────────────┐                               │
+│  │  Main Thread (React)       │                               │
+│  │  ├─ Caméra / Upload        │  ◄── Entrée utilisateur       │
+│  │  ├─ Résultats nutrition    │  ◄── Cards + nutrient bars    │
+│  │  └─ Suppression manuelle   │  ◄── Correction faux positifs │
+│  └───────────┬────────────────┘                               │
+│              │ postMessage                                    │
+│              ▼                                                │
+│  ┌────────────────────────────┐                               │
+│  │  Web Worker                │                               │
+│  │  ├─ ONNX Runtime WASM     │  best.onnx (52 MB, FP16)       │
+│  │  ├─ NMS per + cross-class │  Conf>0.25, IoU>0.45           │
+│  │  ├─ Masques segmentation  │  160×160 → 640×640             │
+│  │  └─ Calcul nutritionnel   │  Pixels → cm² → g → kcal       │
+│  └────────────────────────────┘                               │
+└───────────────────────────────────────────────────────────────┘
+         │
+         │ Hébergé sur Vercel (fichiers statiques)
+         │ https://app-computer-vision.vercel.app/
+         ▼
+┌───────────────────────────────────────────────────────────────┐
+│  Vercel CDN                                                   │
+│  ├─ Next.js 16 (SSG)                                          │
+│  ├─ /models/best.onnx (52 MB, servi en statique)              │
+│  └─ Déploiement automatique sur push main                     │
+└───────────────────────────────────────────────────────────────┘
+```
+
+**Stack technique déployée** :
+
+- **Frontend** : Next.js 16.1 + React 19.2 + Tailwind CSS 4
+- **Inférence** : ONNX Runtime Web 1.24 (WebAssembly, dans Web Worker)
+- **Hébergement** : Vercel (déploiement statique, CDN global)
+- **Modèle** : YOLOv8m-seg ONNX FP16 (52 MB), servi depuis `/public/models/`
+
+**Avantages de l'approche Edge AI** :
+
+- Aucune infrastructure serveur à maintenir
+- Confidentialité totale (images jamais envoyées)
+- Scalabilité gratuite (chaque client exécute l'inférence)
+- Latence ~2-3s (inférence locale, pas de round-trip réseau)
+
+### Améliorations Futures
 
 1. **Segmentation multi-instances** :
    - Remplacer `max(contours)` par détection de tous les contours avec filtrage par aire minimale
@@ -128,7 +119,11 @@ Agrégation totale repas
    - **SegFormer** : Transformer-based segmentation (état de l'art recherche 2025)
 
 4. **Active Learning** :
-   - Déployer en production, collecter prédictions à faible confiance (&lt;0.5)
-   - Faire annotater manuellement (crowdsourcing), réentraîner périodiquement
+   - Collecter prédictions à faible confiance (&lt;0.5) en production
+   - Faire annoter manuellement (crowdsourcing), réentraîner périodiquement
+
+5. **Calibration dynamique** :
+   - Détection automatique d'objet référence (assiette, fourchette) pour calibrer l'échelle
+   - Estimation de profondeur monoculaire (MiDaS) pour améliorer le calcul de volume
 
 ---

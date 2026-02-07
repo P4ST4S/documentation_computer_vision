@@ -10,7 +10,7 @@ const sidebars: SidebarsConfig = {
     'limitations_futurs',
     'annexes',
     'model-gallery',
-    'api',
+    'application',
   ],
 };
 

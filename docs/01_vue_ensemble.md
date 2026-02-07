@@ -13,6 +13,8 @@ import Icon from '@site/src/components/Icon';
 
 **Objectif final** : Développer un compteur de calories intelligent capable d'identifier et de quantifier les aliments à partir d'images photographiques, avec une précision au niveau pixel grâce à la segmentation d'instances.
 
+> **Tester l'application en ligne** : [https://app-computer-vision.vercel.app/](https://app-computer-vision.vercel.app/)
+
 ---
 
 ## <Icon name="Gauge" size={18} /> Résultats Clés
@@ -59,16 +61,27 @@ _Segmentation d'instances alimentaires avec identification des classes et masque
          │
          ▼
 ┌─────────────────────────────────────────────────┐
-│  Post-traitement                                │
-│  - NMS (Non-Maximum Suppression)                │
-│  - Masques binaires par instance (H×W)          │
+│  Post-traitement (dans le navigateur)           │
+│  - NMS per-class + cross-class                  │
+│  - Masques binaires par instance (640×640)      │
 │  - Scores de confiance par classe               │
 └────────┬────────────────────────────────────────┘
          │
          ▼
-┌─────────────────┐
-│  Sortie JSON    │ [{class: "bread", mask: [...], conf: 0.92}, ...]
-└─────────────────┘
+┌─────────────────────────────────────────────────┐
+│  Calcul nutritionnel (Edge AI)                  │
+│  - Pixels → cm² → volume → poids → kcal        │
+│  - Calibration: 640px = 30cm                    │
+│  - Densité et épaisseur par classe              │
+└────────┬────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────┐
+│  Application Web (Next.js + Vercel)             │
+│  - Card par aliment détecté                     │
+│  - Totaux: calories, protéines, glucides, etc.  │
+│  - Suppression manuelle des faux positifs       │
+└─────────────────────────────────────────────────┘
 ```
 
 ---
@@ -84,12 +97,12 @@ _Segmentation d'instances alimentaires avec identification des classes et masque
 5. **[Limitations Et Travaux Futurs](06_limitations_futurs.md)**
 6. **[Annexes](annexes.md)**
 7. **[Galerie Des Modèles](model-gallery.md)**
-8. **[API](api.md)**
+8. **[Application Web](application.md)**
 
 ---
 
 ## <Icon name="Clock3" size={18} /> État Actuel De Développement
 
 -  **Semaine 1-2** : Pipeline de données + Fine-tuning YOLOv8-seg (complété)
--  **Semaine 3** : Régression nutritionnelle (calibration volume/poids)
--  **Semaine 4** : API REST (FastAPI) + Dockerisation
+-  **Semaine 3** : Estimation nutritionnelle physics-based (complété)
+-  **Semaine 4** : Application Next.js Edge AI + Déploiement Vercel (complété) — [Lien](https://app-computer-vision.vercel.app/)

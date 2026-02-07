@@ -35,6 +35,10 @@ function HomepageHeader() {
             <Image size={18} className={styles.buttonIcon} />
             Galerie Des Modèles
           </Link>
+          <Link className="button button--secondary button--lg" href="https://app-computer-vision.vercel.app/">
+            <Rocket size={18} className={styles.buttonIcon} />
+            Tester l&apos;Application
+          </Link>
         </div>
       </div>
     </header>

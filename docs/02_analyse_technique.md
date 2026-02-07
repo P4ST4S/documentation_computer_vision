@@ -651,7 +651,7 @@ model.export(
 1. **Portabilité** : Exécution sur backend non-PyTorch (ONNX Runtime, TensorRT, CoreML)
 2. **Optimisation du graphe** : Fusion d'opérations (Conv+BN+ReLU), élimination de nœuds morts
 3. **Quantification FP16** : Réduction de 50% de la mémoire avec perte de précision &lt;1%
-4. **Intégration production** : Compatible API REST (FastAPI), edge devices (Jetson Nano)
+4. **Intégration production** : Compatible navigateur web (ONNX Runtime Web), edge devices, serveurs
 
 **Limitation identifiée** : Pas de quantification INT8 (nécessiterait calibration dataset, post-training quantization non implémentée).
 

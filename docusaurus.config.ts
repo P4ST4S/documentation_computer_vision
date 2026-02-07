@@ -63,12 +63,12 @@ const config: Config = {
           position: 'left',
         },
         {
-          to: '/docs/api',
-          label: 'API',
+          href: 'https://app-computer-vision.vercel.app/',
+          label: 'Application',
           position: 'left',
         },
         {
-          href: 'https://github.com/your-org/nutriscan',
+          href: 'https://github.com/P4ST4S/app_computer_vision',
           label: 'GitHub',
           position: 'right',
         },
@@ -81,13 +81,13 @@ const config: Config = {
           title: 'Documentation',
           items: [
             {label: 'Documentation', to: '/docs'},
-            {label: 'API', to: '/docs/api'},
+            {label: 'Application', href: 'https://app-computer-vision.vercel.app/'},
           ],
         },
         {
           title: 'Projet',
           items: [
-            {label: 'Dépôt', href: 'https://github.com/your-org/nutriscan'},
+            {label: 'Dépôt', href: 'https://github.com/P4ST4S/app_computer_vision'},
           ],
         },
       ],

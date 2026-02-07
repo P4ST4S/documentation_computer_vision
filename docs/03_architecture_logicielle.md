@@ -156,3 +156,97 @@ External Dependencies:
 ```
 
 ---
+
+### Architecture Application Web (Edge AI)
+
+L'application NutriScan déployée fonctionne **entièrement dans le navigateur** (Edge AI). Il n'y a aucun serveur backend, aucune API REST. Le modèle ONNX est exécuté côté client via ONNX Runtime Web (WebAssembly) dans un Web Worker dédié.
+
+**Application en ligne** : [https://app-computer-vision.vercel.app/](https://app-computer-vision.vercel.app/)
+
+#### Architecture Client-Side
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  Navigateur (client uniquement)                                │
+│                                                                │
+│  ┌────────────────────────────┐                                │
+│  │  Main Thread (React)       │                                │
+│  │  ├─ CameraScanner.tsx      │  ◄── Capture caméra            │
+│  │  ├─ ImageUploader.tsx      │  ◄── Upload fichier            │
+│  │  ├─ NutritionResult.tsx    │  ◄── Affichage résultats       │
+│  │  └─ useInference.ts       │  ◄── Hook cycle de vie Worker   │
+│  └───────────┬────────────────┘                                │
+│              │ postMessage (image base64)                      │
+│              ▼                                                 │
+│  ┌────────────────────────────┐                                │
+│  │  Web Worker                │                                │
+│  │  (inference.worker.ts)     │                                │
+│  │                            │                                │
+│  │  1. Preprocessing          │  Canvas → Tensor [1,3,640,640] │
+│  │  2. ONNX Runtime WASM      │  best.onnx (52 MB)             │
+│  │  3. NMS (per + cross-class)│  Conf>0.25, IoU>0.45           │
+│  │  4. Mask Generation        │  Coeffs × Protos → Sigmoid     │
+│  │  5. Calcul Nutrition       │  Pixels → cm² → g → kcal       │
+│  └───────────┬────────────────┘                                │
+│              │ postMessage (détections + nutrition)            │
+│              ▼                                                 │
+│  Résultat: card par aliment + totaux kcal                      │
+└────────────────────────────────────────────────────────────────┘
+```
+
+#### Structure des Modules TypeScript
+
+```
+app/src/
+├── workers/
+│   └── inference.worker.ts          # Web Worker : chargement ONNX + inférence
+│
+├── hooks/
+│   ├── useInference.ts              # Hook React : init/run/cleanup Worker
+│   └── useCamera.ts                 # Hook React : accès caméra getUserMedia
+│
+├── lib/
+│   ├── inference/
+│   │   ├── types.ts                 # Interfaces : Detection, NutritionInfo, etc.
+│   │   ├── foodDatabase.ts          # Densité, épaisseur, kcal/100g (12 classes)
+│   │   ├── preprocessing.ts         # Image → Float32Array NCHW [1,3,640,640]
+│   │   ├── nms.ts                   # NMS per-class + cross-class confusion groups
+│   │   └── postprocessing.ts        # Masques binaires + calcul nutritionnel
+│   ├── workerClient.ts              # Communication Promise-based (message IDs)
+│   └── constants.ts                 # Seuils, chemins modèle, calibration
+│
+├── components/
+│   ├── CameraScanner.tsx            # Capture caméra temps réel
+│   ├── ImageUploader.tsx            # Upload avec preview
+│   ├── NutritionResult.tsx          # Résultats : totaux + détail par aliment
+│   └── NutrientBar.tsx              # Barre de progression nutriment
+│
+└── app/page.tsx                     # Page principale (orchestration)
+```
+
+#### Communication Worker ↔ Main Thread
+
+Le Worker utilise un protocole de messages avec IDs uniques :
+
+```
+Main Thread                          Web Worker
+    │                                    │
+    │── {id, type: "INIT"} ────────────► │ Charge best.onnx via ONNX Runtime
+    │                                    │
+    │◄── {id, type: "SUCCESS"} ──────────│
+    │                                    │
+    │── {id, type: "INFER",              │
+    │    payload: base64} ─────────────► │ Preprocess → Infer → NMS → Masks
+    │                                    │
+    │◄── {id, type: "SUCCESS",           │
+    │     payload: InferenceResult} ─────│
+```
+
+#### Déploiement Vercel
+
+- **Hébergement** : Vercel (Next.js static)
+- **Modèle ONNX** : servi depuis `/public/models/best.onnx` (52 MB, statique)
+- **WASM** : fichiers ONNX Runtime chargés depuis CDN
+- **Déploiement** : automatique à chaque push sur `main`
+
+---
