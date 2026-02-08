@@ -70,14 +70,15 @@ Input (640×640×3)
 
 #### Modèles Fine-Tunés
 
-**Deux variantes entraînées** :
+**Trois variantes entraînées** :
 
-| Variante        | Paramètres | FLOPS  | Taille poids | mAP50 (Mask) | mAP50-95 (Mask) |
-| --------------- | ---------- | ------ | ------------ | ------------ | --------------- |
-| **YOLOv8s-seg** | 11.82M     | 42.6G  | 23 MB        | 0.587        | 0.475           |
-| **YOLOv8m-seg** | 27.29M     | 110.2G | 53 MB        | 0.617        | 0.511           |
+| Variante        | Dataset | Classes | Paramètres | Taille poids | mAP50 (Mask) | mAP50-95 (Mask) |
+| --------------- | ------- | ------- | ---------- | ------------ | ------------ | --------------- |
+| **YOLOv8s-seg** | FoodSeg103 | 12 | 11.82M | 23 MB | 0.587 | 0.475 |
+| **YOLOv8m-seg** | FoodSeg103 | 12 | 27.29M | 53 MB | 0.617 | 0.511 |
+| **YOLOv8m-seg Fusion** | FoodSeg103 + UEC-FoodPix | 32 | 27.29M | 157 MB | **0.672** | **0.565** |
 
-**Trade-off retenu** : YOLOv8m-seg pour l'équilibre performance/coût computationnel (+3.6% mAP50-95 pour +15M paramètres).
+**Modèle retenu** : YOLOv8m-seg Fusion pour sa couverture alimentaire élargie (32 classes) et ses performances supérieures (+8.9% mAP50, +10.6% mAP50-95 par rapport au modèle FoodSeg103 seul).
 
 #### Détails d'Implémentation
 
@@ -276,6 +277,120 @@ for original_cls_id in np.unique(mask_resized):
 
 ---
 
+### Pipeline de Fusion : FoodSeg103 + UEC-FoodPix (32 classes)
+
+#### Motivation
+
+Le modèle initial entraîné sur FoodSeg103 (12 classes) présentait des limitations :
+- Couverture alimentaire restreinte (pas de poisson, pizza, hamburger, nouilles, etc.)
+- Dataset limité à 4 526 images
+- Biais géographique (cuisine principalement occidentale/chinoise)
+
+Pour y remédier, un **dataset fusionné** a été construit en combinant FoodSeg103 et UEC-FoodPix Complete, portant la couverture à **32 classes alimentaires** et **15 994 images**.
+
+#### Datasets Sources
+
+| Dataset | Images | Classes originales | Format masques |
+| ------- | ------ | ------------------ | -------------- |
+| **FoodSeg103** | 7 118 | 103 + background | Pixel-wise (IDs de classe) |
+| **UEC-FoodPix Complete** | 10 000+ | 102 | Canal rouge du PNG |
+
+#### Mapping vers 32 Classes Unifiées
+
+Les 32 classes cibles ont été définies par intersection et complémentarité des deux datasets (voir `notebooks/01_fusion_exploration.ipynb`) :
+
+| ID | Classe | ID | Classe | ID | Classe | ID | Classe |
+| -- | ------ | -- | ------ | -- | ------ | -- | ------ |
+| 0 | rice | 8 | sausage | 16 | soup | 24 | salad |
+| 1 | bread | 9 | tofu | 17 | sauce | 25 | cheese |
+| 2 | egg | 10 | noodles | 18 | eggplant | 26 | soy_beans |
+| 3 | chicken | 11 | pasta | 19 | spinach | 27 | beverage |
+| 4 | pork | 12 | pizza | 20 | cabbage | 28 | pepper |
+| 5 | steak | 13 | hamburger | 21 | mixed_vegetables | 29 | carrot |
+| 6 | fish | 14 | french_fries | 22 | dumplings | 30 | cake |
+| 7 | shrimp | 15 | potato | 23 | fried_meat | 31 | onion |
+
+#### Pipeline de Fusion (notebooks/02_data_fusion_and_cleaning.ipynb)
+
+```
+┌─────────────────────────┐     ┌─────────────────────────┐
+│  FoodSeg103             │     │  UEC-FoodPix Complete   │
+│  7 118 images           │     │  10 000+ images         │
+│  Masques: pixel IDs     │     │  Masques: canal rouge   │
+└──────────┬──────────────┘     └──────────┬──────────────┘
+           │                               │
+           ▼                               ▼
+┌─────────────────────────────────────────────────┐
+│  Mapping classes → 32 classes cibles            │
+│  - Résolution conflits d'occlusion (priorité)   │
+│  - Conversion masques → polygones YOLO          │
+│  - Filtrage images sans classes cibles           │
+└──────────┬──────────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────────────────────┐
+│  Dataset Fusionné                               │
+│  - 6 515 images FoodSeg103 (conservées)         │
+│  - 9 479 images UEC-FoodPix (conservées)        │
+│  - Total: 15 994 images                         │
+└──────────┬──────────────────────────────────────┘
+           │
+           ▼ Split stratifié 70/15/15
+┌─────────────────────────────────────────────────┐
+│  Train: 11 195 images                           │
+│  Val:    2 399 images                           │
+│  Test:   2 400 images                           │
+│  → data/processed/fusion_32cls/                  │
+└─────────────────────────────────────────────────┘
+```
+
+**Points techniques clés** :
+- **Gestion des conflits d'occlusion** : Système de priorité par classe pour résoudre les chevauchements de masques
+- **Distribution équilibrée** : Répartition proportionnelle des sources (FoodSeg103 / UEC-FoodPix) dans chaque split
+- **Format standardisé** : Conversion uniforme au format YOLO polygonal avec `dataset_fusion.yaml`
+
+#### Distribution des Labels (Fusion)
+
+![Distribution des labels - Fusion](/img/models/yolov8_fusion/labels.jpg)
+
+*Distribution des 32 classes, tailles de bounding boxes et positions des objets dans le dataset fusionné*
+
+#### Hyperparamètres d'Entraînement (Fusion)
+
+Extrait de `models/yolov8_fusion/args.yaml` :
+
+```yaml
+task: segment
+model: yolov8m-seg.pt          # Poids pré-entraînés COCO
+data: fusion_32cls/dataset_fusion.yaml  # 32 classes fusionnées
+epochs: 150                    # Réduit vs 200 (dataset plus grand)
+batch: 16                      # Augmenté vs 12 (plus de données)
+imgsz: 640
+patience: 50
+optimizer: SGD
+lr0: 0.01
+lrf: 0.01
+momentum: 0.937
+weight_decay: 0.0005
+mosaic: 1.0
+mixup: 0.1
+copy_paste: 0.1
+```
+
+**Différences avec l'entraînement FoodSeg103** :
+
+| Paramètre | FoodSeg103 (ancien) | Fusion (nouveau) |
+| --------- | ------------------- | ----------------- |
+| Dataset | 4 526 images | 15 994 images |
+| Classes | 12 | 32 |
+| Époques | 200 | 150 |
+| Batch size | 12 | 16 |
+| Images d'entraînement | 3 168 | 11 195 |
+
+La réduction du nombre d'époques (200 → 150) est justifiée par le dataset 3.5x plus grand, offrant plus de diversité par époque.
+
+---
+
 ### Transformations d'Images : Pipeline Albumentations
 
 #### Séquence de Prétraitement
@@ -387,17 +502,36 @@ cv2.imwrite(output_path, cv2.cvtColor(img_resized, cv2.COLOR_RGB2BGR))
 - Les masques de segmentation sont préservés malgré les transformations
 - Bon équilibre entre les différentes classes alimentaires
 
+**Batches d'entraînement du modèle Fusion (32 classes)** :
+
+![Batch Fusion 0](/img/models/yolov8_fusion/train_batch0.jpg)
+
+*Figure 4 : Batch d'entraînement Fusion montrant la diversité des 32 classes (deux datasets combinés)*
+
+![Batch Fusion 1](/img/models/yolov8_fusion/train_batch1.jpg)
+
+*Figure 5 : Deuxième batch Fusion avec les nouvelles classes (pizza, hamburger, noodles, etc.)*
+
+**Comparaison** : Les batches du modèle Fusion présentent une plus grande variété d'aliments et de styles culinaires (cuisine japonaise, occidentale, chinoise) grâce à la combinaison des deux datasets.
+
 #### Distribution des Labels
 
-**Statistiques des classes dans le dataset** :
+**Statistiques des classes dans le dataset FoodSeg103** :
 
-![Distribution des labels](/img/models/yolov8m_foodseg103/labels.jpg)
+![Distribution des labels FoodSeg103](/img/models/yolov8m_foodseg103/labels.jpg)
 
-*Figure 4 : Distribution des classes, tailles de bounding boxes et positions des objets dans le dataset*
+*Figure 6 : Distribution des 12 classes FoodSeg103, tailles de bounding boxes et positions des objets*
 
-**Analyse de la distribution** :
-- Bonne répartition des 12 classes principales
-- Variété de tailles d'objets (petit à grand)
+**Statistiques des classes dans le dataset Fusion** :
+
+![Distribution des labels Fusion](/img/models/yolov8_fusion/labels.jpg)
+
+*Figure 7 : Distribution des 32 classes fusionnées, tailles de bounding boxes et positions des objets*
+
+**Analyse comparative de la distribution** :
+- Le dataset Fusion couvre 32 classes contre 12, avec une meilleure représentation de la diversité culinaire
+- Le volume de données est 3.5x supérieur (15 994 vs 4 526 images)
+- Variété de tailles d'objets préservée dans les deux datasets
 - Positions réparties sur toute l'image (pas de biais spatial)
 
 ---
@@ -547,12 +681,12 @@ plots: True # Génère courbes d'entraînement
 
 Le modèle est évalué avec les métriques standard **COCO Instance Segmentation** :
 
-| Métrique            | Définition                             | Valeur YOLOv8m |
-| ------------------- | -------------------------------------- | -------------- |
-| **mAP50 (Mask)**    | Mean Average Precision @ IoU=0.50      | **0.617**      |
-| **mAP50-95 (Mask)** | mAP moyenné sur IoU ∈ [0.50:0.95:0.05] | **0.511**      |
-| **Precision**       | TP / (TP + FP) @ conf > 0.25           | 0.605          |
-| **Recall**          | TP / (TP + FN) @ conf > 0.25           | 0.578          |
+| Métrique            | Définition                             | YOLOv8m (12 cls) | YOLOv8m Fusion (32 cls) |
+| ------------------- | -------------------------------------- | ---------------- | ----------------------- |
+| **mAP50 (Mask)**    | Mean Average Precision @ IoU=0.50      | 0.617            | **0.672**               |
+| **mAP50-95 (Mask)** | mAP moyenné sur IoU ∈ [0.50:0.95:0.05] | 0.511            | **0.565**               |
+| **Precision**       | TP / (TP + FP) @ conf > 0.25           | 0.605            | **0.682**               |
+| **Recall**          | TP / (TP + FN) @ conf > 0.25           | 0.578            | **0.632**               |
 
 **Formule mAP50-95** :
 

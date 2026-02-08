@@ -104,6 +104,8 @@ ls data/raw/foodseg103/train/
 
 #### Étape 5 : Prétraitement
 
+**Option A : Pipeline FoodSeg103 uniquement (12 classes)**
+
 ```bash
 # Lancer Jupyter
 jupyter notebook
@@ -122,16 +124,56 @@ with open('data/processed/dataset.yaml') as f:
 print(f"Classes: {len(config['names'])}")  # Attendu: 12
 ```
 
-#### Étape 6 : Entraînement YOLOv8
-
-**Option A : Via notebook (recommandé pour exploration)** :
+**Option B : Pipeline Fusion FoodSeg103 + UEC-FoodPix (32 classes, recommandé)**
 
 ```bash
-# Ouvrir notebooks/03_baseline_yolov8_medium.ipynb
-# Exécuter toutes les cellules ( ~8 heures sur RTX 2060)
+# Ouvrir et exécuter séquentiellement:
+# 1. notebooks/01_fusion_exploration.ipynb (EDA + mapping des deux datasets)
+# 2. notebooks/02_data_fusion_and_cleaning.ipynb (génère data/processed/fusion_32cls/)
 ```
 
-**Option B : Via script Python** :
+**Vérification** :
+
+```python
+import yaml
+with open('data/processed/fusion_32cls/dataset_fusion.yaml') as f:
+    config = yaml.safe_load(f)
+print(f"Classes: {len(config['names'])}")  # Attendu: 32
+```
+
+#### Étape 6 : Entraînement YOLOv8
+
+**Option A : Modèle Fusion 32 classes (recommandé)** :
+
+```bash
+# Ouvrir notebooks/03_train_yolov8_fusion.ipynb
+# Exécuter toutes les cellules
+```
+
+Ou via script Python :
+
+```python
+from src.models.yolov8_trainer import YOLOv8Trainer
+
+trainer = YOLOv8Trainer(
+    model_name="yolov8m-seg.pt",
+    experiment_name="nutriscan_fusion"
+)
+
+results = trainer.train(
+    data_yaml="data/processed/fusion_32cls/dataset_fusion.yaml",
+    epochs=150,
+    batch=16,        # Ajuster selon VRAM disponible
+    imgsz=640,
+    device="cuda",
+    patience=50,
+    save_period=15
+)
+
+print(f"mAP50 final: {results['metrics/mAP50(M)']:.3f}")
+```
+
+**Option B : Modèle FoodSeg103 uniquement (12 classes)** :
 
 ```python
 from src.models.yolov8_trainer import YOLOv8Trainer
@@ -144,9 +186,9 @@ trainer = YOLOv8Trainer(
 results = trainer.train(
     data_yaml="data/processed/dataset.yaml",
     epochs=200,
-    batch=12,        # Ajuster selon VRAM disponible
+    batch=12,
     imgsz=640,
-    device="cuda",   # ou "cpu"
+    device="cuda",
     patience=50,
     save_period=15
 )
@@ -156,46 +198,60 @@ print(f"mAP50 final: {results['metrics/mAP50(M)']:.3f}")
 
 **Temps d'entraînement estimés** :
 
-| GPU              | Batch Size | Temps/Époque | 200 Époques |
-| ---------------- | ---------- | ------------ | ----------- |
-| RTX 2060 (12 GB) | 12         | ~2.5 min     | ~8h20       |
-| RTX 3090 (24 GB) | 24         | ~1.2 min     | ~4h00       |
-| V100 (16 GB)     | 16         | ~1.8 min     | ~6h00       |
-| CPU (32 GB RAM)  | 4          | ~45 min      | ~6 jours    |
+| GPU              | Modèle | Batch Size | Époques | Temps estimé |
+| ---------------- | ------ | ---------- | ------- | ------------ |
+| RTX 2060 (12 GB) | Fusion 32cls | 16 | 150 | ~10h |
+| RTX 2060 (12 GB) | FoodSeg103 12cls | 12 | 200 | ~8h20 |
+| RTX 3090 (24 GB) | Fusion 32cls | 32 | 150 | ~5h |
+| CPU (32 GB RAM)  | FoodSeg103 12cls | 4 | 200 | ~6 jours |
 
 #### Étape 7 : Validation
 
+**Modèle Fusion (32 classes)** :
+
 ```python
-from src.models.yolov8_trainer import YOLOv8Trainer
 from ultralytics import YOLO
 
-# Charger le meilleur modèle
-model = YOLO('models/yolov8m_foodseg103/weights/best.pt')
+model = YOLO('models/yolov8_fusion/weights/best.pt')
 
-# Valider sur test set
 metrics = model.val(
-    data='data/processed/dataset.yaml',
-    split='test'  # Spécifie le split test
+    data='data/processed/fusion_32cls/dataset_fusion.yaml',
+    split='test'
 )
 
 print(f"mAP50 (Mask): {metrics.seg.map50:.3f}")
 print(f"mAP50-95 (Mask): {metrics.seg.map:.3f}")
 ```
 
-Résultats attendus (YOLOv8m) :
+Résultats attendus (Fusion) :
 
 ```
-mAP50 (Mask): 0.617
-mAP50-95 (Mask): 0.511
+mAP50 (Mask): 0.672
+mAP50-95 (Mask): 0.565
 ```
 
-**Visualisation des résultats** :
+**Modèle FoodSeg103 (12 classes)** :
 
-Les résultats de validation sont sauvegardés automatiquement. Vous pouvez visualiser :
+```python
+model = YOLO('models/yolov8m_foodseg103/weights/best.pt')
 
-![Résultats de validation](/img/models/yolov8m_foodseg103/val_batch0_pred.jpg)
+metrics = model.val(
+    data='data/processed/dataset.yaml',
+    split='test'
+)
 
-_Exemple de prédictions sur un batch de validation avec masques de segmentation_
+print(f"mAP50 (Mask): {metrics.seg.map50:.3f}")
+print(f"mAP50-95 (Mask): {metrics.seg.map:.3f}")
+# Attendu: mAP50=0.617, mAP50-95=0.511
+```
+
+**Comparaison visuelle des prédictions** :
+
+| FoodSeg103 (12 classes) | Fusion (32 classes) |
+| --- | --- |
+| ![Validation FoodSeg103](/img/models/yolov8m_foodseg103/val_batch0_pred.jpg) | ![Validation Fusion](/img/models/yolov8_fusion/val_batch0_pred.jpg) |
+
+_Prédictions sur les batches de validation : le modèle Fusion détecte plus de catégories d'aliments_
 
 #### Étape 8 : Inférence sur Image
 

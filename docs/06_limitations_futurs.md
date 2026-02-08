@@ -8,20 +8,31 @@ title: Limitations Et Travaux Futurs
 
 ## Limitations Identifiées
 
-### Limitations Techniques
+### Limitations Résolues par le Modèle Fusion
+
+Le passage au modèle Fusion (32 classes, FoodSeg103 + UEC-FoodPix) a permis de résoudre ou d'atténuer plusieurs limitations de l'ancien modèle :
+
+| Limitation (ancien modèle) | Statut | Amélioration apportée par le modèle Fusion |
+| -------------------------- | ------ | ------------------------------------------ |
+| **Couverture alimentaire restreinte (12 classes)** | **Résolu** | 32 classes couvrant viandes, poissons, pâtes, pizza, hamburger, etc. |
+| **Dataset limité (4 526 images)** | **Résolu** | 15 994 images (×3.5), meilleure généralisation |
+| **Biais géographique** | **Atténué** | UEC-FoodPix apporte la cuisine japonaise, meilleure diversité |
+| **Confusion viandes** | **Atténué** | mAP globale +10.6%, meilleure discrimination grâce à plus de données |
+
+### Limitations Persistantes
 
 | Limitation                     | Impact | Explication Technique                                                                                                                                                                                    |
 | ------------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Instance unique par classe** | Majeur | L'algorithme `mask_to_yolo_format()` sélectionne le plus grand contour uniquement (ligne 117: `max(contours, key=cv2.contourArea)`). **Exemple raté** : Image avec 2 pommes de terre → 1 seule détectée. |
-| **Classes déséquilibrées**     | Modéré | Ratio 2.1:1 entre classe max (bread, 991 img) et min (rice, 464 img). Modèle biaisé vers classes fréquentes.                                                                                             |
 | **Résolution 640×640**         | Modéré | Textures fines (viandes, sauces) perdent détails critiques après downscaling depuis 798×652 px moyen.                                                                                                    |
-| **Confusion viandes**          | Modéré | Le modèle confond fréquemment steak/porc/poulet (mAP faible sur porc ~19%). Atténué par NMS cross-class + suppression manuelle UX.                                                                       |
+| **Taille du modèle Fusion**   | Modéré | 157 MB (vs 53 MB ancien modèle). Impact sur le temps de chargement dans le navigateur pour l'application Edge AI. |
+| **Classes encore déséquilibrées** | Modéré | Malgré la fusion, certaines classes restent sous-représentées dans le dataset combiné. |
 
 ### Limitations du Dataset
 
-- **Biais géographique** : FoodSeg103 surreprésente cuisine occidentale/chinoise
 - **Conditions d'acquisition** : Photos professionnelles haute qualité ≠ photos utilisateurs (flou, éclairage faible, angles extrêmes)
 - **Annotations imprécises** : Erreurs manuelles dans masques (vérifiées en EDA, ~2% d'images)
+- **Biais résiduel** : La fusion FoodSeg103 + UEC-FoodPix couvre principalement les cuisines occidentale, chinoise et japonaise
 
 ## Travaux Réalisés
 
@@ -110,20 +121,27 @@ Agrégation totale du repas
    - Remplacer `max(contours)` par détection de tous les contours avec filtrage par aire minimale
    - Associer un `instance_id` unique par objet
 
-2. **Augmentation Dataset** :
-   - **Style transfer** : Appliquer textures aliments sur scènes synthétiques 3D
-   - **GANs** : Génération d'images de repas avec labels automatiques
+2. **Optimisation du modèle Fusion pour le déploiement** :
+   - **Quantification INT8** : Réduire la taille du modèle de 157 MB à ~40 MB pour le déploiement Edge AI
+   - **Pruning** : Élaguer les neurones peu contributifs pour accélérer l'inférence
+   - **Knowledge Distillation** : Entraîner un modèle Small avec les prédictions du modèle Fusion comme "teacher"
 
-3. **Architecture avancée** :
+3. **Extension du dataset fusionné** :
+   - Intégrer d'autres datasets (Food-101, ISIA Food-500) pour couvrir plus de cuisines
+   - **GANs** : Génération d'images de repas synthétiques pour les classes sous-représentées
+   - **Active Learning** : Collecter prédictions à faible confiance en production, annoter et réentraîner
+
+4. **Architecture avancée** :
    - **Mask R-CNN** : Meilleure gestion des instances multiples (plus lent, +12% mAP attendu)
    - **SegFormer** : Transformer-based segmentation (état de l'art recherche 2025)
-
-4. **Active Learning** :
-   - Collecter prédictions à faible confiance (&lt;0.5) en production
-   - Faire annoter manuellement (crowdsourcing), réentraîner périodiquement
+   - **YOLOv9/v10** : Nouvelles architectures YOLO avec potentiel d'amélioration
 
 5. **Calibration dynamique** :
    - Détection automatique d'objet référence (assiette, fourchette) pour calibrer l'échelle
    - Estimation de profondeur monoculaire (MiDaS) pour améliorer le calcul de volume
+
+6. **Base de données nutritionnelle étendue** :
+   - Adapter la base nutritionnelle de 12 à 32 classes pour le modèle Fusion
+   - Intégrer une API nutritionnelle (Open Food Facts) pour des données plus précises
 
 ---

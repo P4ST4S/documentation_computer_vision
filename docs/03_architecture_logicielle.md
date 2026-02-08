@@ -25,14 +25,25 @@ G-AIA-910-PAR-9-2-computervision-12/
 │       │   ├── train/             # 2880 fichiers .txt (polygones)
 │       │   ├── val/               # 617 fichiers .txt
 │       │   └── test/              # 618 fichiers .txt
-│       └── dataset.yaml           # Configuration YOLO (12 classes)
+│       ├── dataset.yaml           # Configuration YOLO (12 classes)
+│       └── fusion_32cls/          # Dataset fusionné (32 classes)
+│           ├── images/
+│           │   ├── train/         # 11 195 images
+│           │   ├── val/           # 2 399 images
+│           │   └── test/          # 2 400 images
+│           ├── labels/            # Annotations YOLO polygonales
+│           └── dataset_fusion.yaml # Configuration YOLO (32 classes)
 │
 ├── notebooks/                     # Pipeline Jupyter interactif
-│   ├── 01_data_exploration.ipynb         # EDA (1.98 MB, 103 classes analysées)
-│   ├── 02_preprocessing.ipynb            # Prétraitement (1.22 MB, filtrage 12 classes)
-│   ├── 03_baseline_yolov8.ipynb          # YOLOv8s-seg (145 KB, mAP50=0.587)
-│   ├── 03_baseline_yolov8_medium.ipynb   # YOLOv8m-seg (152 KB, mAP50=0.617)
-│   ├── 04_quantization_export.ipynb      # Export ONNX (3 KB)
+│   ├── 01_data_exploration.ipynb         # EDA FoodSeg103 (1.98 MB, 103 classes)
+│   ├── 01_fusion_exploration.ipynb       # EDA Fusion FoodSeg103 + UEC-FoodPix
+│   ├── 02_preprocessing.ipynb            # Prétraitement FoodSeg103 (12 classes)
+│   ├── 02_data_fusion_and_cleaning.ipynb # Fusion datasets → 32 classes
+│   ├── 03_baseline_yolov8.ipynb          # YOLOv8s-seg (mAP50=0.587)
+│   ├── 03_baseline_yolov8_medium.ipynb   # YOLOv8m-seg (mAP50=0.617)
+│   ├── 03_train_yolov8_fusion.ipynb      # YOLOv8m Fusion (mAP50=0.672)
+│   ├── 04_quantization_export.ipynb      # Export ONNX FP16
+│   ├── 04_export_production.ipynb        # Export production
 │   ├── mlflow.db                          # SQLite tracking (expériences)
 │   ├── yolov8s-seg.pt                    # Poids pré-entraînés Small (23 MB)
 │   └── yolov8m-seg.pt                    # Poids pré-entraînés Medium (54 MB)
@@ -54,24 +65,32 @@ G-AIA-910-PAR-9-2-computervision-12/
 │       └── visualization.py       # Overlays, grids, heatmaps (149 lignes)
 │
 ├── models/                        # Checkpoints entraînés
-│   ├── yolov8s_foodseg103/
+│   ├── yolov8s_foodseg103/        # Baseline Small (12 classes)
 │   │   ├── args.yaml              # Hyperparamètres d'entraînement
 │   │   ├── weights/
 │   │   │   ├── best.pt            # Meilleur modèle (mAP50 val max)
 │   │   │   ├── last.pt            # Dernière époque
-│   │   │   └── epoch*.pt          # Checkpoints périodiques (tous les 15 époques)
+│   │   │   └── epoch*.pt          # Checkpoints périodiques
 │   │   ├── results.csv            # Métriques par époque
 │   │   ├── results.png            # Courbes d'apprentissage
 │   │   ├── confusion_matrix.png
-│   │   ├── F1_curve.png
-│   │   ├── P_curve.png            # Precision curve
-│   │   ├── R_curve.png            # Recall curve
-│   │   ├── PR_curve.png           # Precision-Recall curve
+│   │   ├── *_curve.png            # F1, P, R, PR curves
 │   │   └── val_batch*.jpg         # Prédictions validation
-│   └── yolov8m_foodseg103/        # (Structure identique)
-│       └── weights/
-│           ├── best.pt            # 52.3 MB PyTorch
-│           └── best.onnx          # 52.1 MB ONNX FP16
+│   ├── yolov8m_foodseg103/        # Medium (12 classes)
+│   │   └── weights/
+│   │       ├── best.pt            # 52.3 MB PyTorch
+│   │       └── best.onnx          # 52.1 MB ONNX FP16
+│   └── yolov8_fusion/             # Fusion (32 classes) ← MODÈLE ACTUEL
+│       ├── args.yaml              # 150 époques, batch=16
+│       ├── weights/
+│       │   ├── best.pt            # 157 MB PyTorch
+│       │   └── last.pt
+│       ├── results.csv
+│       ├── results.png
+│       ├── confusion_matrix*.png  # Matrices 32×32
+│       ├── *_curve.png            # Courbes performance
+│       ├── predictions.json       # Résultats d'inférence
+│       └── val_batch*.jpg         # Prédictions validation
 │
 ├── scripts/                       # Utilitaires système
 │   ├── download_datasets.sh      # Bash (Linux/macOS)
@@ -122,6 +141,8 @@ External Dependencies:
 
 ### Flux de Données : Du Jeu de Données au Modèle
 
+#### Pipeline initiale (FoodSeg103, 12 classes)
+
 ```
 [HuggingFace Hub]
         │
@@ -138,21 +159,49 @@ External Dependencies:
 [data/processed/]
    ├─ images/ (4526 JPEG 640×640)
    ├─ labels/ (4115 .txt polygones)
-   └─ dataset.yaml (config YOLO)
+   └─ dataset.yaml (config YOLO, 12 classes)
         │
         ▼ notebooks/03_baseline_yolov8_medium.ipynb
-        │ - Chargement yolov8m-seg.pt (COCO)
-        │ - Fine-tuning 200 époques
-        │ - Augmentations: mosaic, mixup, copy-paste
+        │ - Fine-tuning 200 époques, batch=12
         │
 [models/yolov8m_foodseg103/]
    └─ weights/best.pt (mAP50=0.617)
+```
+
+#### Pipeline Fusion (FoodSeg103 + UEC-FoodPix, 32 classes) — Modèle actuel
+
+```
+[FoodSeg103]              [UEC-FoodPix Complete]
+  7 118 images              10 000+ images
+        │                         │
+        ▼                         ▼
+   notebooks/01_fusion_exploration.ipynb
+        │ - Mapping classes → 32 cibles
+        │ - Analyse complémentarité
         │
-        ▼ notebooks/04_quantization_export.ipynb
-        │ - Export ONNX FP16
+        ▼
+   notebooks/02_data_fusion_and_cleaning.ipynb
+        │ - Fusion des deux datasets
+        │ - Résolution conflits d'occlusion
+        │ - Conversion masques → polygones YOLO
+        │ - Split stratifié 70/15/15
         │
-[models/yolov8m_foodseg103/weights/best.onnx]
-   (Prêt pour déploiement production)
+[data/processed/fusion_32cls/]
+   ├─ images/ (15 994 JPEG 640×640)
+   ├─ labels/ (.txt polygones)
+   └─ dataset_fusion.yaml (config YOLO, 32 classes)
+        │
+        ▼ notebooks/03_train_yolov8_fusion.ipynb
+        │ - Chargement yolov8m-seg.pt (COCO)
+        │ - Fine-tuning 150 époques, batch=16
+        │ - Augmentations: mosaic, mixup, copy-paste
+        │
+[models/yolov8_fusion/]
+   └─ weights/best.pt (mAP50=0.672, mAP50-95=0.565)
+        │
+        ▼ Export ONNX FP16
+        │
+[Prêt pour déploiement production]
 ```
 
 ---
