@@ -63,17 +63,17 @@ export default function Home(): ReactNode {
               <article className={styles.metricCard}>
                 <Brain size={20} />
                 <h3>Modèle</h3>
-                <p>YOLOv8m-seg (27,3M paramètres)</p>
+                <p>YOLOv8m-seg Fusion (32 classes)</p>
               </article>
               <article className={styles.metricCard}>
                 <Gauge size={20} />
                 <h3>Performance</h3>
-                <p>mAP50 = 0.617, mAP50-95 = 0.511</p>
+                <p>mAP50 = 0.672, mAP50-95 = 0.565</p>
               </article>
               <article className={styles.metricCard}>
                 <Database size={20} />
                 <h3>Jeu De Données</h3>
-                <p>FoodSeg103 (4526 images, 12 classes)</p>
+                <p>FoodSeg103 + UEC-FoodPix (15 994 images)</p>
               </article>
               <article className={styles.metricCard}>
                 <Rocket size={20} />
@@ -92,12 +92,12 @@ export default function Home(): ReactNode {
             </Heading>
             <figure className={styles.figure}>
               <img
-                src="/img/models/yolov8m_foodseg103/val_batch0_pred.jpg"
-                alt="Segmentation automatique d'aliments avec masques par instance"
+                src="/img/models/yolov8_fusion/val_batch0_pred.jpg"
+                alt="Segmentation automatique d'aliments avec masques par instance (32 classes)"
                 className={styles.preview}
               />
               <figcaption>
-                Segmentation automatique d&apos;aliments avec masques par instance (YOLOv8m-seg).
+                Segmentation automatique d&apos;aliments avec masques par instance (YOLOv8m-seg Fusion, 32 classes).
               </figcaption>
             </figure>
           </div>
@@ -136,11 +136,11 @@ python3 -m venv venv
 source venv/bin/activate  # Windows: venv\\Scripts\\activate
 pip install -r requirements.txt
 
-# Télécharger le dataset
-bash scripts/download_datasets.sh
+# Préparation du dataset fusionné (32 classes)
+jupyter notebook notebooks/02_data_fusion_and_cleaning.ipynb
 
-# Lancer l'entraînement
-jupyter notebook notebooks/03_baseline_yolov8.ipynb
+# Entraînement du modèle Fusion
+jupyter notebook notebooks/03_train_yolov8_fusion.ipynb
 
 # Visualiser les métriques MLflow
 mlflow ui`}</code>
